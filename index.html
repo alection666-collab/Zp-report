@@ -28,7 +28,10 @@ input{font:inherit;color:var(--tx);background:var(--bg);border:1px solid var(--l
 input:focus,button:focus-visible{outline:2px solid var(--ac);outline-offset:1px}
 .r{display:flex;gap:8px;align-items:center;margin-bottom:8px}
 .n{width:22px;color:var(--mu);font-size:14px;text-align:right;flex:none}
-.amt{width:104px;flex:none;text-align:right}
+.amt{width:112px;flex:none;text-align:right}
+.dt{flex:1}
+.rw{border-top:1px solid var(--ln);padding-top:8px}
+.rw:first-of-type{border-top:0;padding-top:0}
 .chips{display:flex;gap:4px;flex:1}
 .chip{flex:1;padding:9px 0;border:1px solid var(--ln);background:var(--bg);color:var(--mu);border-radius:10px;font:inherit;font-weight:700;cursor:pointer}
 .chip.on{background:var(--ac);border-color:var(--ac);color:var(--tt)}
@@ -45,6 +48,7 @@ button{font:inherit;cursor:pointer}
 .sum .per{font-size:14px;opacity:.8;margin-bottom:6px}
 .btns{display:flex;gap:8px}
 .btns button{flex:1;padding:13px;border-radius:12px;border:1px solid var(--ac);background:var(--ac);color:var(--tt);font-weight:700}
+.btns button.sec2{background:none;color:var(--ac);border-color:var(--ln);font-size:14px}
 .btns button.sec{background:none;color:var(--dg);border-color:var(--ln)}
 pre{white-space:pre-wrap;word-break:break-word;font:14px/1.5 ui-monospace,Menlo,monospace;background:var(--bg);border:1px solid var(--ln);border-radius:10px;padding:10px;margin:8px 0 0}
 details summary{font-weight:700;cursor:pointer}
@@ -87,6 +91,11 @@ details summary{font-weight:700;cursor:pointer}
   <button data-a="copy">Скопировать отчёт</button>
   <button class="sec" data-a="reset">Новый период</button>
 </div>
+<div class="btns" style="margin-top:8px">
+  <button class="sec2" data-a="export">Сохранить копию в файл</button>
+  <button class="sec2" data-a="import">Восстановить из файла</button>
+</div>
+<input type="file" id="imp" accept=".json,application/json" hidden>
 <div class="ok" id="ok"></div>
 <div class="card" style="margin-top:6px"><details><summary>Текст отчёта</summary><pre id="rep"></pre></details></div>
 </main>
@@ -98,7 +107,8 @@ var S;
 function today(){var d=new Date(),y=d.getFullYear(),m=d.getMonth(),a=d.getDate()<=15;
  function f(dt){return dt.getFullYear()+"-"+String(dt.getMonth()+1).padStart(2,"0")+"-"+String(dt.getDate()).padStart(2,"0")}
  return a?{from:f(new Date(y,m,1)),to:f(new Date(y,m,15))}:{from:f(new Date(y,m,16)),to:f(new Date(y,m+1,0))}}
-function fresh(){var p=today();return{from:p.from,to:p.to,events:[{name:"",rows:[{c:[],a:""}]}],trips:[],exps:[],debt:""}}
+function iso(d){d=d||new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")}
+function fresh(){var p=today();return{from:p.from,to:p.to,events:[{name:"",rows:[{c:[],a:"",d:iso()}]}],trips:[],exps:[],debt:""}}
 function load(){try{var v=localStorage.getItem(KEY);if(v)return JSON.parse(v)}catch(e){}return fresh()}
 function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 function num(v){var n=parseFloat(v);return isNaN(n)?0:n}
@@ -125,9 +135,9 @@ function render(){
  S.events.forEach(function(e,i){
   h+='<div class="card"><div class="hd"><input list="evnames" placeholder="Название площадки — впишите любое" value="'+esc(e.name)+'" data-p="events.'+i+'.name"><button class="x" data-a="delEvent" data-i="'+i+'" aria-label="Удалить">×</button></div>';
   e.rows.forEach(function(r,j){
-   h+='<div class="r"><span class="n">'+(j+1)+'</span><div class="chips">';
+   h+='<div class="rw"><div class="r"><input class="dt" type="date" value="'+esc(r.d)+'" data-p="events.'+i+'.rows.'+j+'.d" aria-label="Дата"><input class="amt" type="number" inputmode="numeric" placeholder="сумма" value="'+esc(r.a)+'" data-p="events.'+i+'.rows.'+j+'.a"><button class="x" data-a="delRow" data-i="'+i+'" data-j="'+j+'" aria-label="Удалить строку">×</button></div><div class="chips" style="margin-bottom:12px">';
    CODES.forEach(function(k){h+='<button class="chip'+(k[0]=="Деж"?" dz":"")+(r.c.indexOf(k[0])>-1?" on":"")+'" data-a="chip" data-i="'+i+'" data-j="'+j+'" data-k="'+k[0]+'">'+k[1]+'</button>'});
-   h+='</div><input class="amt" type="number" inputmode="numeric" placeholder="сумма" value="'+esc(r.a)+'" data-p="events.'+i+'.rows.'+j+'.a"><button class="x" data-a="delRow" data-i="'+i+'" data-j="'+j+'" aria-label="Удалить строку">×</button></div>'});
+   h+='</div></div>'});
   h+='<button class="add" data-a="addRow" data-i="'+i+'">+ Строка</button><div class="sub" data-sub="e'+i+'"></div></div>'});
  document.getElementById("events").innerHTML=h;
  h="";
@@ -161,7 +171,10 @@ function report(){
  S.events.forEach(function(e){
   if(!e.name&&!e.rows.some(function(r){return r.a}))return;
   o.push((e.name||"Без названия")+":");
-  var k=0;e.rows.forEach(function(r){if(!r.a&&!r.c.length)return;k++;o.push(k+". "+codeStr(r.c)+(codeStr(r.c)?" ":"")+num(r.a))});o.push("")});
+  var rows=e.rows.filter(function(r){return r.a||r.c.length}).map(function(r,x){return{r:r,x:x}});
+  rows.sort(function(p,q){var a=p.r.d||"9",b=q.r.d||"9";return a<b?-1:a>b?1:p.x-q.x});
+  rows.forEach(function(it,k){var r=it.r,day=r.d?parseInt(r.d.split("-")[2],10):k+1;o.push(day+". "+codeStr(r.c)+(codeStr(r.c)?" ":"")+num(r.a))});
+  o.push("")});
  S.trips.forEach(function(t){
   o.push((t.city||"Командировка")+":");
   o.push((t.dates?t.dates+"   ":"")+num(t.a)+"₽"+(num(t.pd)*num(t.days)?" +"+num(t.pd)*num(t.days)+" суточные("+num(t.days)+" дн.)":""));o.push("")});
@@ -179,9 +192,9 @@ document.addEventListener("input",function(ev){
 document.addEventListener("click",function(ev){
  var b=ev.target.closest("[data-a]");if(!b)return;
  var a=b.dataset.a,i=+b.dataset.i,j=+b.dataset.j;
- if(a=="addEvent")S.events.push({name:"",rows:[{c:[],a:""}]});
+ if(a=="addEvent")S.events.push({name:"",rows:[{c:[],a:"",d:iso()}]});
  else if(a=="delEvent"){if(confirm("Удалить мероприятие?"))S.events.splice(i,1);else return}
- else if(a=="addRow")S.events[i].rows.push({c:[],a:""});
+ else if(a=="addRow"){var rr=S.events[i].rows;S.events[i].rows.push({c:[],a:"",d:rr.length?rr[rr.length-1].d:iso()})}
  else if(a=="delRow")S.events[i].rows.splice(j,1);
  else if(a=="chip"){var c=S.events[i].rows[j].c,x=c.indexOf(b.dataset.k);if(x>-1)c.splice(x,1);else c.push(b.dataset.k)}
  else if(a=="addTrip")S.trips.push({city:"",dates:"",a:"",pd:"",days:""});
@@ -189,15 +202,37 @@ document.addEventListener("click",function(ev){
  else if(a=="addExp")S.exps.push({d:"",t:"",a:""});
  else if(a=="delExp")S.exps.splice(i,1);
  else if(a=="copy"){copyText(report());return}
+ else if(a=="export"){exportData();return}
+ else if(a=="import"){document.getElementById("imp").click();return}
  else if(a=="reset"){if(confirm("Очистить всё и начать новый период?")){S=fresh();document.getElementById("ok").textContent=""}else return}
  render()});
 
+function exportData(){
+ var ok=document.getElementById("ok");
+ try{
+  var blob=new Blob([JSON.stringify({v:1,state:S,names:hist()})],{type:"application/json"});
+  var a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="zp-backup-"+iso()+".json";
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+  ok.textContent="Копия сохранена в «Загрузки» (zp-backup-"+iso()+".json)";
+ }catch(e){ok.textContent="Не удалось сохранить файл"}}
+document.getElementById("imp").addEventListener("change",function(ev){
+ var f=ev.target.files[0],ok=document.getElementById("ok");if(!f)return;
+ var r=new FileReader();
+ r.onload=function(){try{
+  var d=JSON.parse(r.result);if(!d.state||!d.state.events)throw 0;
+  if(!confirm("Заменить текущие данные данными из файла?"))return;
+  S=d.state;S.trips=S.trips||[];S.exps=S.exps||[];
+  try{localStorage.setItem("zp_names",JSON.stringify(d.names||[]))}catch(e){}
+  render();fillList();ok.textContent="Данные восстановлены";
+ }catch(e){ok.textContent="Это не файл копии приложения"}ev.target.value=""};
+ r.readAsText(f)});
 function copyText(t){
  var ok=document.getElementById("ok");
  function fb(){var ta=document.createElement("textarea");ta.value=t;ta.style.position="fixed";ta.style.opacity="0";document.body.appendChild(ta);ta.select();var r=false;try{r=document.execCommand("copy")}catch(e){}document.body.removeChild(ta);ok.textContent=r?"Отчёт скопирован":"Не удалось скопировать — откройте «Текст отчёта» и выделите вручную"}
  try{navigator.clipboard.writeText(t).then(function(){ok.textContent="Отчёт скопирован"},fb)}catch(e){fb()}}
 
 S=load();render();fillList();
+if(navigator.storage&&navigator.storage.persist){navigator.storage.persist().catch(function(){})}
 if("serviceWorker" in navigator){window.addEventListener("load",function(){navigator.serviceWorker.register("sw.js").catch(function(){})})}
 </script>
 </body>
